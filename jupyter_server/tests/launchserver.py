@@ -19,6 +19,7 @@ from tornado.ioloop import IOLoop
 import zmq
 
 import jupyter_core.paths
+from jupyter_kernel_mgmt.discovery import KernelSpecProvider, IPykernelProvider
 from traitlets.config import Config
 from ..serverapp import ServerApp
 from ..utils import url_path_join
@@ -155,6 +156,10 @@ class ServerTestBase(TestCase):
                 config=config,
                 allow_root=True,
                 token=cls.token,
+                kernel_providers=[
+                    KernelSpecProvider(search_path=[pjoin(data_dir, 'kernels')]),
+                    IPykernelProvider(),
+                ],
             )
             # don't register signal handler during tests
             app.init_signal = lambda : None

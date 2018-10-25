@@ -87,8 +87,8 @@ from jupyter_core.application import (
 )
 from jupyter_core.paths import jupyter_config_path
 from jupyter_client import KernelManager
-from jupyter_client.kernelspec import KernelSpecManager, NoSuchKernel, NATIVE_KERNEL_NAME
 from jupyter_client.session import Session
+from jupyter_kernel_mgmt.discovery import KernelFinder
 from nbformat.sign import NotebookNotary
 from traitlets import (
     Any, Dict, Unicode, Integer, List, Bool, Bytes, Instance,
@@ -158,13 +158,13 @@ def load_handlers(name):
 class ServerWebApplication(web.Application):
 
     def __init__(self, jupyter_app, default_services, kernel_manager, contents_manager,
-                 session_manager, kernel_spec_manager,
+                 session_manager, kernel_finder,
                  config_manager, extra_services, log,
                  base_url, default_url, settings_overrides, jinja_env_options):
 
         settings = self.init_settings(
             jupyter_app, kernel_manager, contents_manager,
-            session_manager, kernel_spec_manager, config_manager,
+            session_manager, kernel_finder, config_manager,
             extra_services, log, base_url,
             default_url, settings_overrides, jinja_env_options)
         handlers = self.init_handlers(default_services, settings)
@@ -172,7 +172,7 @@ class ServerWebApplication(web.Application):
         super(ServerWebApplication, self).__init__(handlers, **settings)
 
     def init_settings(self, jupyter_app, kernel_manager, contents_manager,
-                      session_manager, kernel_spec_manager,
+                      session_manager, kernel_finder,
                       config_manager, extra_services,
                       log, base_url, default_url, settings_overrides,
                       jinja_env_options=None):
@@ -247,10 +247,10 @@ class ServerWebApplication(web.Application):
             local_hostnames=jupyter_app.local_hostnames,
 
             # managers
+            kernel_finder=kernel_finder,
             kernel_manager=kernel_manager,
             contents_manager=contents_manager,
             session_manager=session_manager,
-            kernel_spec_manager=kernel_spec_manager,
             config_manager=config_manager,
 
             # handlers
@@ -554,7 +554,7 @@ class ServerApp(JupyterApp):
     flags = flags
 
     classes = [
-        KernelManager, Session, MappingKernelManager, KernelSpecManager,
+        KernelManager, Session, MappingKernelManager,
         ContentsManager, FileContentsManager, NotebookNotary,
         GatewayKernelManager, GatewayKernelSpecManager, GatewaySessionManager, GatewayClient,
     ]
@@ -1030,6 +1030,12 @@ class ServerApp(JupyterApp):
         (shutdown the Jupyter server)."""
     )
 
+    kernel_providers = List(config=True,
+        help=_('A list of kernel provider instances. '
+               'If not specified, all installed kernel providers are found '
+               'using entry points.')
+    )
+
     contents_manager_class = Type(
         default_value=LargeFileManager,
         klass=ContentsManager,
@@ -1053,20 +1059,6 @@ class ServerApp(JupyterApp):
         default_value=ConfigManager,
         config = True,
         help=_('The config manager class to use')
-    )
-
-    kernel_spec_manager = Instance(KernelSpecManager, allow_none=True)
-
-    kernel_spec_manager_class = Type(
-        default_value=KernelSpecManager,
-        config=True,
-        help="""
-        The kernel spec manager class to use. Should be a subclass
-        of `jupyter_client.kernelspec.KernelSpecManager`.
-
-        The Api of KernelSpecManager is provisional and might change
-        without warning between this version of Jupyter and the next stable one.
-        """
     )
 
     login_handler_class = Type(
@@ -1101,7 +1093,7 @@ class ServerApp(JupyterApp):
     def _default_browser_open_file(self):
         basename = "jpserver-%s-open.html" % os.getpid()
         return os.path.join(self.runtime_dir, basename)
-    
+
     pylab = Unicode('disabled', config=True,
         help=_("""
         DISABLED: use %pylab or %matplotlib in the notebook to enable matplotlib.
@@ -1234,16 +1226,23 @@ class ServerApp(JupyterApp):
         if self.gateway_config.gateway_enabled:
             self.kernel_manager_class = 'jupyter_server.gateway.managers.GatewayKernelManager'
             self.session_manager_class = 'jupyter_server.gateway.managers.GatewaySessionManager'
-            self.kernel_spec_manager_class = 'jupyter_server.gateway.managers.GatewayKernelSpecManager'
+# FIXME - no more kernel-spec-manager!
+#           self.kernel_spec_manager_class = 'jupyter_server.gateway.managers.GatewayKernelSpecManager'
+#
+#        self.kernel_spec_manager = self.kernel_spec_manager_class(
+#            parent=self,
+#        )
 
-        self.kernel_spec_manager = self.kernel_spec_manager_class(
-            parent=self,
-        )
+        if self.kernel_providers:
+            self.kernel_finder = KernelFinder(self.kernel_providers)
+        else:
+            self.kernel_finder = KernelFinder.from_entrypoints()
+
         self.kernel_manager = self.kernel_manager_class(
             parent=self,
             log=self.log,
             connection_dir=self.runtime_dir,
-            kernel_spec_manager=self.kernel_spec_manager,
+            kernel_finder=self.kernel_finder,
         )
         self.contents_manager = self.contents_manager_class(
             parent=self,
@@ -1298,7 +1297,7 @@ class ServerApp(JupyterApp):
 
         self.web_app = ServerWebApplication(
             self, self.default_services, self.kernel_manager, self.contents_manager,
-            self.session_manager, self.kernel_spec_manager,
+            self.session_manager, self.kernel_finder,
             self.config_manager, self.extra_services,
             self.log, self.base_url, self.default_url, self.tornado_settings,
             self.jinja_environment_options,
@@ -1493,7 +1492,7 @@ class ServerApp(JupyterApp):
 
         Import the module, then call the load_jupyter_server_extension function,
         if one exists.
-        
+
         The extension API is experimental, and may change in future releases.
         """
         for modulename, enabled in sorted(self.jpserver_extensions.items()):
