@@ -16,7 +16,7 @@ from tornado.concurrent import Future
 from tornado.ioloop import IOLoop
 from tornado.websocket import WebSocketHandler
 
-from jupyter_client.jsonutil import date_default
+from jupyter_protocol.jsonutil import date_default
 from jupyter_protocol.messages import Message
 from ipython_genutils.py3compat import cast_unicode
 from jupyter_server.utils import url_path_join, url_escape, maybe_future

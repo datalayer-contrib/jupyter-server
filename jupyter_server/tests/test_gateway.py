@@ -6,18 +6,12 @@ from datetime import datetime
 from tornado import gen
 from tornado.httpclient import HTTPRequest, HTTPResponse, HTTPError
 from ipython_genutils.py3compat import str_to_unicode
+from unittest.mock import patch, Mock
+from io import StringIO
+
 from .launchserver import ServerTestBase
 from jupyter_server.gateway.managers import GatewayClient
 
-try:
-    from unittest.mock import patch, Mock
-except ImportError:
-    from mock import patch, Mock # py2
-
-try:
-    from io import StringIO
-except ImportError:
-    import StringIO
 
 import nose.tools as nt
 
@@ -175,7 +169,7 @@ class TestGateway(ServerTestBase):
         # Ensure appropriate class mappings are in place.
         nt.assert_equal(self.server.kernel_manager_class.__name__, 'GatewayKernelManager')
         nt.assert_equal(self.server.session_manager_class.__name__, 'GatewaySessionManager')
-        nt.assert_equal(self.server.kernel_spec_manager_class.__name__, 'GatewayKernelSpecManager')
+        nt.assert_equal(self.server.kernel_finder.__class__.__name__, 'GatewayKernelFinder')
 
     def test_gateway_get_kernelspecs(self):
         # Validate that kernelspecs come from gateway.

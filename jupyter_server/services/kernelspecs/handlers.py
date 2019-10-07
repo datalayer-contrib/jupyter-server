@@ -63,7 +63,9 @@ class MainKernelSpecHandler(APIHandler):
         model = {}
         model['default'] = km.default_kernel_name
         model['kernelspecs'] = specs = {}
-        for kernel_name, kernel_info in kf.find_kernels():
+
+        found_specs = yield maybe_future(kf.find_kernels())
+        for kernel_name, kernel_info in found_specs.items():
             try:
                 if is_kernelspec_model(kernel_info):
                     d = kernel_info
@@ -85,7 +87,8 @@ class KernelSpecHandler(APIHandler):
         kf = self.kernel_finder
         # TODO: Do we actually want all kernel type names to be case-insensitive?
         kernel_name = kernel_name.lower()
-        for name, info in kf.find_kernels():
+        found_specs = yield maybe_future(kf.find_kernels())
+        for name, info in found_specs.items():
             if name == kernel_name:
                 model = kernelspec_model(self, kernel_name, info,
                                          info['resource_dir'])

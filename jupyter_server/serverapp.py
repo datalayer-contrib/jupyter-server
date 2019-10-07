@@ -74,7 +74,7 @@ from .services.contents.manager import ContentsManager
 from .services.contents.filemanager import FileContentsManager
 from .services.contents.largefilemanager import LargeFileManager
 from .services.sessions.sessionmanager import SessionManager
-from .gateway.managers import GatewayKernelManager, GatewayKernelSpecManager, GatewaySessionManager, GatewayClient
+from .gateway.managers import GatewayKernelManager, GatewayKernelFinder, GatewaySessionManager, GatewayClient
 
 from .auth.login import LoginHandler
 from .auth.logout import LogoutHandler
@@ -86,8 +86,7 @@ from jupyter_core.application import (
     JupyterApp, base_flags, base_aliases,
 )
 from jupyter_core.paths import jupyter_config_path
-from jupyter_client import KernelManager
-from jupyter_client.session import Session
+from jupyter_protocol.session import Session
 from jupyter_kernel_mgmt.discovery import KernelFinder
 from nbformat.sign import NotebookNotary
 from traitlets import (
@@ -528,7 +527,6 @@ aliases.update({
     'ip': 'ServerApp.ip',
     'port': 'ServerApp.port',
     'port-retries': 'ServerApp.port_retries',
-    'transport': 'KernelManager.transport',
     'keyfile': 'ServerApp.keyfile',
     'certfile': 'ServerApp.certfile',
     'client-ca': 'ServerApp.client_ca',
@@ -554,9 +552,8 @@ class ServerApp(JupyterApp):
     flags = flags
 
     classes = [
-        KernelManager, Session, MappingKernelManager,
-        ContentsManager, FileContentsManager, NotebookNotary,
-        GatewayKernelManager, GatewayKernelSpecManager, GatewaySessionManager, GatewayClient,
+        Session, MappingKernelManager,
+        ContentsManager, FileContentsManager, NotebookNotary, GatewayClient,
     ]
     flags = Dict(flags)
     aliases = Dict(aliases)
@@ -1219,6 +1216,7 @@ class ServerApp(JupyterApp):
 
     def init_configurables(self):
 
+
         # If gateway server is configured, replace appropriate managers to perform redirection.  To make
         # this determination, instantiate the GatewayClient config singleton.
         self.gateway_config = GatewayClient.instance(parent=self)
@@ -1226,17 +1224,12 @@ class ServerApp(JupyterApp):
         if self.gateway_config.gateway_enabled:
             self.kernel_manager_class = 'jupyter_server.gateway.managers.GatewayKernelManager'
             self.session_manager_class = 'jupyter_server.gateway.managers.GatewaySessionManager'
-# FIXME - no more kernel-spec-manager!
-#           self.kernel_spec_manager_class = 'jupyter_server.gateway.managers.GatewayKernelSpecManager'
-#
-#        self.kernel_spec_manager = self.kernel_spec_manager_class(
-#            parent=self,
-#        )
-
-        if self.kernel_providers:
-            self.kernel_finder = KernelFinder(self.kernel_providers)
+            self.kernel_finder = GatewayKernelFinder(parent=self)  # no providers here, alway go remote
         else:
-            self.kernel_finder = KernelFinder.from_entrypoints()
+            if self.kernel_providers:
+                self.kernel_finder = KernelFinder(self.kernel_providers)
+            else:
+                self.kernel_finder = KernelFinder.from_entrypoints()
 
         self.kernel_manager = self.kernel_manager_class(
             parent=self,
@@ -1578,7 +1571,7 @@ class ServerApp(JupyterApp):
         """Shutdown all kernels.
 
         The kernels will shutdown themselves when this process no longer exists,
-        but explicit shutdown allows the KernelManagers to cleanup the connection files.
+        but explicit shutdown allows the Kernel Providers to cleanup the connection files.
         """
         n_kernels = len(self.kernel_manager.list_kernel_ids())
         kernel_msg = trans.ngettext('Shutting down %d kernel', 'Shutting down %d kernels', n_kernels)

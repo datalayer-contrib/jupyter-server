@@ -11,7 +11,8 @@ import sys
 from dateutil.tz import tzutc
 
 from ipython_genutils.py3compat import cast_unicode
-from jupyter_client.jsonutil import date_default, extract_dates
+from jupyter_protocol.jsonutil import date_default, extract_dates
+
 
 def serialize_message(msg, channel):
     """Serialize a message from the kernel, using JSON.
@@ -31,6 +32,7 @@ def serialize_message(msg, channel):
         d['buffers'] = []
         smsg = json.dumps(d, default=date_default)
         return cast_unicode(smsg)
+
 
 def serialize_binary_message(msg_dict, buffers):
     """serialize a message as a binary blob
@@ -64,6 +66,7 @@ def serialize_binary_message(msg_dict, buffers):
     buffers.insert(0, offsets_buf)
     return b''.join(buffers)
 
+
 def deserialize_message(msg):
     """Deserialize a websocket message, return a dict.
 
@@ -78,6 +81,7 @@ def deserialize_message(msg):
     msg['header'] = convert_tz_utc(extract_dates(msg['header']))
     msg['parent_header'] = convert_tz_utc(extract_dates(msg['parent_header']))
     return msg
+
 
 def deserialize_binary_message(bmsg):
     """deserialize a message from a binary blob
@@ -104,6 +108,7 @@ def deserialize_binary_message(bmsg):
 
     msg['buffers'] = bufs[1:]
     return msg
+
 
 def convert_tz_utc(obj):
     """Replace dateutil tzutc objects with stdlib datetime utc objects"""

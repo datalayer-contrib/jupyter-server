@@ -165,10 +165,6 @@ class KernelInterface(LoggingConfigurable):
 class MappingKernelManager(LoggingConfigurable):
     """A KernelManager that handles notebook mapping and HTTP error handling"""
 
-    @default('kernel_manager_class')
-    def _default_kernel_manager_class(self):
-        return "jupyter_client.ioloop.IOLoopKernelManager"
-
     default_kernel_name = Unicode('pyimport/kernel', config=True,
         help="The name of the default kernel to start"
     )

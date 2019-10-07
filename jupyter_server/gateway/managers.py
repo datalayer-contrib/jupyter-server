@@ -3,7 +3,9 @@
 
 import os
 import json
+import logging
 
+from jupyter_kernel_mgmt.discovery import KernelFinder
 from socket import gaierror
 from tornado import gen, web
 from tornado.escape import json_encode, json_decode, url_escape
@@ -12,7 +14,6 @@ from tornado.httpclient import HTTPClient, AsyncHTTPClient, HTTPError
 from ..services.kernels.kernelmanager import MappingKernelManager
 from ..services.sessions.sessionmanager import SessionManager
 
-from jupyter_client.kernelspec import KernelSpecManager
 from ..utils import url_path_join
 
 from traitlets import Instance, Unicode, Float, Bool, default, validate, TraitError
@@ -496,14 +497,16 @@ class GatewayKernelManager(MappingKernelManager):
             self.remove_kernel(kernel_id)
 
 
-class GatewayKernelSpecManager(KernelSpecManager):
-
-    def __init__(self, **kwargs):
-        super(GatewayKernelSpecManager, self).__init__(**kwargs)
+class GatewayKernelFinder(KernelFinder):
+    def __init__(self, parent, providers=[]):
+        super(GatewayKernelFinder, self).__init__(providers=providers)
         self.base_endpoint = url_path_join(GatewayClient.instance().url,
                                            GatewayClient.instance().kernelspecs_endpoint)
         self.base_resource_endpoint = url_path_join(GatewayClient.instance().url,
                                                     GatewayClient.instance().kernelspecs_resource_endpoint)
+        # Because KernelFinder is not a taitlet/Configurable, we need to simulate a configurable
+        self.parent = parent
+        self.log = logging.getLogger(__name__)
 
     def _get_kernelspecs_endpoint_url(self, kernel_name=None):
         """Builds a url for the kernels endpoint
@@ -516,6 +519,11 @@ class GatewayKernelSpecManager(KernelSpecManager):
             return url_path_join(self.base_endpoint, url_escape(kernel_name))
 
         return self.base_endpoint
+
+    @gen.coroutine
+    def find_kernels(self):
+        remote_kspecs = yield self.get_all_specs()
+        raise gen.Return(remote_kspecs)
 
     @gen.coroutine
     def get_all_specs(self):

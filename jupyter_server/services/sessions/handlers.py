@@ -11,9 +11,9 @@ import json
 from tornado import gen, web
 
 from ...base.handlers import APIHandler
-from jupyter_client.jsonutil import date_default
+from jupyter_protocol.jsonutil import date_default
 from jupyter_server.utils import maybe_future, url_path_join
-from jupyter_client.kernelspec import NoSuchKernel
+from jupyter_kernel_mgmt.kernelspec import NoSuchKernel
 
 
 class SessionRootHandler(APIHandler):

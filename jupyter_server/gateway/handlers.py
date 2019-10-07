@@ -16,7 +16,7 @@ from tornado.httpclient import HTTPRequest
 from tornado.escape import url_escape, json_decode, utf8
 
 from ipython_genutils.py3compat import cast_unicode
-from jupyter_client.session import Session
+from jupyter_protocol.session import Session, new_id
 from traitlets.config.configurable import LoggingConfigurable
 
 from .managers import GatewayClient
@@ -58,7 +58,7 @@ class WebSocketChannelsHandler(WebSocketHandler, JupyterHandler):
 
     def initialize(self):
         self.log.debug("Initializing websocket connection %s", self.request.path)
-        self.session = Session(config=self.config)
+        self.session = Session(key=new_id())
         self.gateway = GatewayWebSocketClient(gateway_url=GatewayClient.instance().url)
 
     @gen.coroutine
