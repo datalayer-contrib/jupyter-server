@@ -74,7 +74,7 @@ from .services.contents.manager import ContentsManager
 from .services.contents.filemanager import FileContentsManager
 from .services.contents.largefilemanager import LargeFileManager
 from .services.sessions.sessionmanager import SessionManager
-from .gateway.managers import GatewayKernelManager, GatewayKernelFinder, GatewaySessionManager, GatewayClient
+from .gateway.managers import GatewayKernelFinder, GatewayClient
 
 from .auth.login import LoginHandler
 from .auth.logout import LogoutHandler
@@ -86,7 +86,6 @@ from jupyter_core.application import (
     JupyterApp, base_flags, base_aliases,
 )
 from jupyter_core.paths import jupyter_config_path
-from jupyter_protocol.session import Session
 from jupyter_kernel_mgmt.discovery import KernelFinder
 from nbformat.sign import NotebookNotary
 from traitlets import (
@@ -552,8 +551,7 @@ class ServerApp(JupyterApp):
     flags = flags
 
     classes = [
-        Session, MappingKernelManager,
-        ContentsManager, FileContentsManager, NotebookNotary, GatewayClient,
+        MappingKernelManager, ContentsManager, FileContentsManager, NotebookNotary, GatewayClient,
     ]
     flags = Dict(flags)
     aliases = Dict(aliases)
