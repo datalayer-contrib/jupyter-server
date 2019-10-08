@@ -406,6 +406,17 @@ class MappingKernelManager(LoggingConfigurable):
         ).dec()
 
     @gen.coroutine
+    def interrupt_kernel(self, kernel_id):
+        """Interrupt a kernel by kernel_id. """
+
+        self._check_kernel_id(kernel_id)
+        kernel = self.get_kernel(kernel_id)
+
+        # Don't interrupt a kernel while it's still starting
+        yield kernel.client_ready()
+        kernel.interrupt()
+
+    @gen.coroutine
     def restart_kernel(self, kernel_id):
         """Restart a kernel by kernel_id
 

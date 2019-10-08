@@ -294,7 +294,7 @@ class TestGateway(ServerTestBase):
             return False
 
     def create_kernel(self, kernel_name):
-        """Issues request to retart the given kernel
+        """Issues request to start the given kernel
         """
         with mocked_gateway:
             kwargs = dict()

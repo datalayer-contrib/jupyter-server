@@ -1224,7 +1224,7 @@ class ServerApp(JupyterApp):
         if self.gateway_config.gateway_enabled:
             self.kernel_manager_class = 'jupyter_server.gateway.managers.GatewayKernelManager'
             self.session_manager_class = 'jupyter_server.gateway.managers.GatewaySessionManager'
-            self.kernel_finder = GatewayKernelFinder(parent=self)  # no providers here, alway go remote
+            self.kernel_finder = GatewayKernelFinder(parent=self)  # no providers here, always go remote
         else:
             if self.kernel_providers:
                 self.kernel_finder = KernelFinder(self.kernel_providers)
