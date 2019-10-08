@@ -14,8 +14,7 @@ from tornado.httpclient import HTTPClient, AsyncHTTPClient, HTTPError
 from ..services.kernels.kernelmanager import MappingKernelManager
 from ..services.sessions.sessionmanager import SessionManager
 
-from ..utils import url_path_join
-
+from ..utils import url_path_join, maybe_future
 from traitlets import Instance, Unicode, Float, Bool, default, validate, TraitError
 from traitlets.config import SingletonConfigurable
 
@@ -522,8 +521,13 @@ class GatewayKernelFinder(KernelFinder):
 
     @gen.coroutine
     def find_kernels(self):
-        remote_kspecs = yield self.get_all_specs()
-        raise gen.Return(remote_kspecs)
+        remote_kspecs_list = []
+        remote_kspecs = yield maybe_future(self.get_all_specs())
+        # convert to list of 2 tuples
+        for kernel_type, attributes in remote_kspecs.items():
+            remote_kspecs_list.append((kernel_type, attributes))
+
+        raise gen.Return(remote_kspecs_list)
 
     @gen.coroutine
     def get_all_specs(self):

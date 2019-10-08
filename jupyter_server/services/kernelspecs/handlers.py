@@ -63,9 +63,8 @@ class MainKernelSpecHandler(APIHandler):
         model = {}
         model['default'] = km.default_kernel_name
         model['kernelspecs'] = specs = {}
-
-        found_specs = yield maybe_future(kf.find_kernels())
-        for kernel_name, kernel_info in found_specs:
+        found_kernels = yield maybe_future(kf.find_kernels())
+        for kernel_name, kernel_info in found_kernels:
             try:
                 if is_kernelspec_model(kernel_info):
                     d = kernel_info
@@ -75,6 +74,7 @@ class MainKernelSpecHandler(APIHandler):
                 self.log.error("Failed to load kernel spec: '%s'", kernel_name, exc_info=True)
                 continue
             specs[kernel_name] = d
+
         self.set_header("Content-Type", 'application/json')
         self.finish(json.dumps(model))
 
