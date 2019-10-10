@@ -132,9 +132,9 @@ class SessionHandler(APIHandler):
                 changes['kernel_id'] = kernel_id
             elif model['kernel'].get('name') is not None:
                 kernel_name = model['kernel']['name']
-                kernel_id = sm.start_kernel_for_session(
+                kernel_id = yield maybe_future(sm.start_kernel_for_session(
                     session_id, kernel_name=kernel_name, name=before['name'],
-                    path=before['path'], type=before['type'])
+                    path=before['path'], type=before['type']))
                 changes['kernel_id'] = kernel_id
 
         yield maybe_future(sm.update_session(session_id, **changes))

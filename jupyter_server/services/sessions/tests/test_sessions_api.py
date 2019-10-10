@@ -132,9 +132,15 @@ class SessionAPITest(ServerTestBase):
         sid = newsession['id']
         got = self.sess_api.get(sid).json()
 
-        # Kernel state may have changed from 'starting' to 'idle'
-        del got['kernel']['execution_state']
-        del newsession['kernel']['execution_state']
+        # Kernel state may have changed from 'starting' to 'idle',
+        # but let's only clean up if that's the case
+        if got['kernel']['execution_state'] == 'idle' and newsession['kernel']['execution_state'] == 'starting':
+            del got['kernel']['execution_state']
+            del newsession['kernel']['execution_state']
+            # include their last_activity as well
+            del got['kernel']['last_activity']
+            del newsession['kernel']['last_activity']
+
         self.assertEqual(got, newsession)
 
     def test_create_file_session(self):
