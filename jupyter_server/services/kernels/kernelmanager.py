@@ -36,21 +36,26 @@ class KernelInterface(LoggingConfigurable):
     A KernelInterface instance persists across kernel restarts, whereas
     manager and client objects are recreated.
     """
-    def __init__(self, kernel_type, kernel_finder):
+    def __init__(self, kernel_type, kernel_finder, connection_info, manager):
         super(KernelInterface, self).__init__()
         self.kernel_type = kernel_type
         self.kernel_finder = kernel_finder
 
-        self.connection_info, self.manager = kernel_finder.launch(kernel_type)
+        self.connection_info = connection_info
+        self.manager = manager
         self.n_connections = 0
         self.execution_state = 'starting'
         self.last_activity = utcnow()
 
-        self.restarter = TornadoKernelRestarter(self.manager, kernel_type,
+        self.restarter = TornadoKernelRestarter(self.manager, self.kernel_type,
                                            kernel_finder=self.kernel_finder)
         self.restarter.add_callback(self._handle_kernel_died, 'died')
         self.restarter.add_callback(self._handle_kernel_restarted, 'restarted')
         self.restarter.start()
+
+        # A future that resolves when the client is connected
+        self.client_connected = self._connect_client()
+        self._client_connected_evt = Event()
 
         self.buffer_for_key = None
         # TODO: the buffer should likely be a memory bounded queue, we're starting with a list to keep it simple
@@ -59,9 +64,12 @@ class KernelInterface(LoggingConfigurable):
         # Message handlers stored here don't have to be re-added if the kernel
         # is restarted.
         self.msg_handlers = []
-        # A future that resolves when the client is connected
-        self.client_connected = self._connect_client()
-        self._client_connected_evt = Event()
+
+    @classmethod
+    @gen.coroutine
+    def launch(cls, kernel_type, kernel_finder):
+        connection_info, manager = yield kernel_finder.launch(kernel_type)
+        raise gen.Return(cls(kernel_type, kernel_finder, connection_info, manager))
 
     client = None
 
@@ -105,8 +113,9 @@ class KernelInterface(LoggingConfigurable):
         self._close_client()
         self.manager.cleanup()
 
+    @gen.coroutine
     def interrupt(self):
-        self.manager.interrupt()
+        yield self.manager.interrupt()
 
     @gen.coroutine
     def _handle_kernel_died(self, data):
@@ -126,7 +135,7 @@ class KernelInterface(LoggingConfigurable):
         yield self.shutdown()
         # The restart will trigger _handle_kernel_restarted() to connect a
         # new client.
-        self.restarter.do_restart()
+        yield self.restarter.do_restart()
         # Resume monitoring the kernel for auto-restart
         self.restarter.start()
         yield self._client_connected_evt.wait()
@@ -307,7 +316,7 @@ class MappingKernelManager(LoggingConfigurable):
             an existing kernel is returned, but it may be checked in the future.
         """
         if kernel_id is None:
-            kernel_id = self.start_launching_kernel(path, kernel_name, **kwargs)
+            kernel_id = yield maybe_future(self.start_launching_kernel(path=path, kernel_name=kernel_name))
             yield self.get_kernel(kernel_id).client_ready()
         else:
             self._check_kernel_id(kernel_id)
@@ -316,12 +325,13 @@ class MappingKernelManager(LoggingConfigurable):
         # py2-compat
         raise gen.Return(kernel_id)
 
+    @gen.coroutine
     def start_launching_kernel(self, path=None, kernel_name=None, **kwargs):
         """Launch a new kernel, return its kernel ID
 
-        This is a synchronous method which starts the process of launching a
-        kernel. Retrieve the KernelInterface object and call ``.client_ready()``
-        to get a future for the rest of the startup & connection.
+        This is a coroutine which starts the process of launching a kernel.
+        Retrieve the KernelInterface object via the launch class method and call
+        ``.client_ready()`` to get a future for the rest of the startup & connection.
         """
         if path is not None:
             kwargs['cwd'] = self.cwd_for_path(path)
@@ -331,7 +341,7 @@ class MappingKernelManager(LoggingConfigurable):
         elif '/' not in kernel_name:
             kernel_name = 'spec/' + kernel_name
 
-        kernel = KernelInterface(kernel_name, self.kernel_finder)
+        kernel = yield KernelInterface.launch(kernel_name, self.kernel_finder)
         kernel_id = kernel.manager.kernel_id
         if kernel_id is None:  # if provider didn't set a kernel_id, let's associate one to this kernel
             kernel_id = str(uuid.uuid4())
@@ -414,7 +424,7 @@ class MappingKernelManager(LoggingConfigurable):
 
         # Don't interrupt a kernel while it's still starting
         yield kernel.client_ready()
-        kernel.interrupt()
+        yield kernel.interrupt()
 
     @gen.coroutine
     def restart_kernel(self, kernel_id):
