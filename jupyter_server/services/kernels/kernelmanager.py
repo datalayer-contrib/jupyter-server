@@ -67,8 +67,8 @@ class KernelInterface(LoggingConfigurable):
 
     @classmethod
     @gen.coroutine
-    def launch(cls, kernel_type, kernel_finder):
-        connection_info, manager = yield kernel_finder.launch(kernel_type)
+    def launch(cls, kernel_type, kernel_finder, **kwargs):
+        connection_info, manager = yield kernel_finder.launch(kernel_type, **kwargs)
         raise gen.Return(cls(kernel_type, kernel_finder, connection_info, manager))
 
     client = None
@@ -316,7 +316,7 @@ class MappingKernelManager(LoggingConfigurable):
             an existing kernel is returned, but it may be checked in the future.
         """
         if kernel_id is None:
-            kernel_id = yield maybe_future(self.start_launching_kernel(path=path, kernel_name=kernel_name))
+            kernel_id = yield maybe_future(self.start_launching_kernel(path=path, kernel_name=kernel_name, **kwargs))
             yield self.get_kernel(kernel_id).client_ready()
         else:
             self._check_kernel_id(kernel_id)
@@ -341,7 +341,7 @@ class MappingKernelManager(LoggingConfigurable):
         elif '/' not in kernel_name:
             kernel_name = 'spec/' + kernel_name
 
-        kernel = yield KernelInterface.launch(kernel_name, self.kernel_finder)
+        kernel = yield KernelInterface.launch(kernel_name, self.kernel_finder, **kwargs)
         kernel_id = kernel.manager.kernel_id
         if kernel_id is None:  # if provider didn't set a kernel_id, let's associate one to this kernel
             kernel_id = str(uuid.uuid4())

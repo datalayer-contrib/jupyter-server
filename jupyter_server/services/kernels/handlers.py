@@ -47,7 +47,9 @@ class MainKernelHandler(APIHandler):
         else:
             model.setdefault('name', km.default_kernel_name)
 
-        kernel_id = yield maybe_future(km.start_kernel(kernel_name=model['name']))
+        launch_params = model.get('launch_params', {})
+
+        kernel_id = yield maybe_future(km.start_kernel(kernel_name=model['name'], launch_params=launch_params))
         model = yield maybe_future(km.kernel_model(kernel_id))
         location = url_path_join(self.base_url, 'api', 'kernels', url_escape(kernel_id))
         self.set_header('Location', location)

@@ -40,7 +40,7 @@ class KernelAPI(object):
         return self._req('GET', id)
 
     def start(self, name='pyimport/kernel'):
-        body = json.dumps({'name': name})
+        body = json.dumps({'name': name, 'launch_params': {'foo': 1, 'bar': 'baz'}})
         return self._req('POST', '', body)
 
     def shutdown(self, id):
