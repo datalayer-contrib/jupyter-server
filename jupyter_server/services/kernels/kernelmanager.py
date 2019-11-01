@@ -105,13 +105,13 @@ class KernelInterface(LoggingConfigurable):
         self.restarter.stop()
 
         if now or (self.client is None):
-            self.manager.kill()
+            yield self.manager.kill()
         else:
             yield self.client_connected
             yield self.client.shutdown_or_terminate()
 
         self._close_client()
-        self.manager.cleanup()
+        yield self.manager.cleanup()
 
     @gen.coroutine
     def interrupt(self):
