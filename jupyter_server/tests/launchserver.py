@@ -4,9 +4,11 @@ from __future__ import print_function
 
 from binascii import hexlify
 from contextlib import contextmanager
+import asyncio
 import errno
 import os
 import sys
+import threading
 from threading import Thread, Event
 import time
 from unittest import TestCase
@@ -19,6 +21,7 @@ from tornado.ioloop import IOLoop
 import zmq
 
 import jupyter_core.paths
+from jupyter_kernel_mgmt.discovery import KernelSpecProvider, IPykernelProvider
 from traitlets.config import Config
 from ..serverapp import ServerApp
 from ..utils import url_path_join
@@ -139,10 +142,9 @@ class ServerTestBase(TestCase):
         cls.token = hexlify(os.urandom(4)).decode('ascii')
 
         started = Event()
+
         def start_thread():
-            if 'asyncio' in sys.modules:
-                import asyncio
-                asyncio.set_event_loop(asyncio.new_event_loop())
+            asyncio.set_event_loop(asyncio.new_event_loop())
             app = cls.server = ServerApp(
                 port=cls.port,
                 port_retries=0,
@@ -155,6 +157,10 @@ class ServerTestBase(TestCase):
                 config=config,
                 allow_root=True,
                 token=cls.token,
+                kernel_providers=[
+                    KernelSpecProvider(search_path=[pjoin(data_dir, 'kernels')]),
+                    IPykernelProvider(),
+                ],
             )
             # don't register signal handler during tests
             app.init_signal = lambda : None
@@ -173,6 +179,13 @@ class ServerTestBase(TestCase):
                 # set the event, so failure to start doesn't cause a hang
                 started.set()
                 app.session_manager.close()
+
+        # The following is required for kernel api tests in order for asyncio.create_subprocess_exec()
+        # to work from tests - which requires that child_watcher be on the main thread.
+        # https://docs.python.org/3/library/asyncio-subprocess.html#subprocess-and-threads
+        asyncio.get_event_loop()
+        asyncio.get_child_watcher()
+
         cls.server_thread = Thread(target=start_thread)
         cls.server_thread.daemon = True
         cls.server_thread.start()
